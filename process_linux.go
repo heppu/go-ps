@@ -3,8 +3,11 @@
 package ps
 
 import (
+	"bufio"
 	"fmt"
 	"io/ioutil"
+	"os"
+	"strconv"
 	"strings"
 )
 
@@ -30,6 +33,25 @@ func (p *UnixProcess) Refresh() error {
 		&p.ppid,
 		&p.pgrp,
 		&p.sid)
+	if err != nil {
+		return err
+	}
 
+	// Parse uid
+	file, err := os.Open(fmt.Sprintf("/proc/%d/status", p.pid))
+	if err != nil {
+		return err
+	}
+	scanner := bufio.NewScanner(file)
+	scanner.Split(bufio.ScanLines)
+	i := 0
+	for scanner.Scan() {
+		if i == 8 {
+			p.uid, err = strconv.Atoi(strings.SplitN(strings.TrimSpace(scanner.Text()[5:]), "\t", 2)[0])
+			break
+		}
+		i++
+	}
+	file.Close()
 	return err
 }

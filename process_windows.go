@@ -38,10 +38,19 @@ type PROCESSENTRY32 struct {
 	ExeFile           [MAX_PATH]uint16
 }
 
+// User ids mapped to names
+var users = make(map[int]string)
+
+// Get user names and user ids from /etc/passwd
+func init() {
+
+}
+
 // WindowsProcess is an implementation of Process for Windows.
 type WindowsProcess struct {
 	pid  int
 	ppid int
+	uid  int
 	exe  string
 }
 
@@ -51,6 +60,14 @@ func (p *WindowsProcess) Pid() int {
 
 func (p *WindowsProcess) PPid() int {
 	return p.ppid
+}
+
+func (p *UnixProcess) Uid() int {
+	return p.uid
+}
+
+func (p *UnixProcess) User() string {
+	return users[p.uid]
 }
 
 func (p *WindowsProcess) Executable() string {

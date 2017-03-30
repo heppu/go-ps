@@ -3,11 +3,38 @@
 package ps
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
 	"strconv"
+	"strings"
 )
+
+// User ids mapped to names
+var users = make(map[int]string)
+
+// Get user names and user ids from /etc/passwd
+func init() {
+	file, err := os.Open("/etc/passwd")
+	if err != nil {
+		return
+	}
+	scanner := bufio.NewScanner(file)
+	scanner.Split(bufio.ScanLines)
+	for scanner.Scan() {
+		s := strings.Split(scanner.Text(), ":")
+		if len(s) < 3 {
+			continue
+		}
+		i, err := strconv.Atoi(s[2])
+		if err != nil {
+			continue
+		}
+		users[i] = s[0]
+	}
+	file.Close()
+}
 
 // UnixProcess is an implementation of Process that contains Unix-specific
 // fields and information.
@@ -17,6 +44,7 @@ type UnixProcess struct {
 	state rune
 	pgrp  int
 	sid   int
+	uid   int
 
 	binary string
 }
@@ -27,6 +55,14 @@ func (p *UnixProcess) Pid() int {
 
 func (p *UnixProcess) PPid() int {
 	return p.ppid
+}
+
+func (p *UnixProcess) Uid() int {
+	return p.uid
+}
+
+func (p *UnixProcess) User() string {
+	return users[p.uid]
 }
 
 func (p *UnixProcess) Executable() string {

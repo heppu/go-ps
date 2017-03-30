@@ -82,7 +82,9 @@ func (p *UnixProcess) Refresh() error {
 	}
 
 	p.ppid = int(psinfo.Pr_ppid)
+	p.uid = int(psinfo.Pr_uid)
 	p.binary = toString(psinfo.Pr_fname[:], 16)
+
 	return nil
 }
 

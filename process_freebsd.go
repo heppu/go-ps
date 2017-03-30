@@ -3,8 +3,12 @@
 package ps
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
+	"os"
+	"strconv"
+	"strings"
 	"syscall"
 	"unsafe"
 )
@@ -101,6 +105,31 @@ type Kinfo_proc struct {
 	Ki_tdflags      int64
 }
 
+// User ids mapped to names
+var users = make(map[int]string)
+
+// Get user names and user ids from /etc/passwd
+func init() {
+	file, err := os.Open("/etc/passwd")
+	if err != nil {
+		return
+	}
+	scanner := bufio.NewScanner(file)
+	scanner.Split(bufio.ScanLines)
+	for scanner.Scan() {
+		s := strings.Split(scanner.Text(), ":")
+		if len(s) < 3 {
+			continue
+		}
+		i, err := strconv.Atoi(s[2])
+		if err != nil {
+			continue
+		}
+		users[i] = s[0]
+	}
+	file.Close()
+}
+
 // UnixProcess is an implementation of Process that contains Unix-specific
 // fields and information.
 type UnixProcess struct {
@@ -109,6 +138,7 @@ type UnixProcess struct {
 	state rune
 	pgrp  int
 	sid   int
+	uid   int
 
 	binary string
 }
@@ -119,6 +149,14 @@ func (p *UnixProcess) Pid() int {
 
 func (p *UnixProcess) PPid() int {
 	return p.ppid
+}
+
+func (p *UnixProcess) Uid() int {
+	return p.uid
+}
+
+func (p *UnixProcess) User() string {
+	return users[p.uid]
 }
 
 func (p *UnixProcess) Executable() string {
@@ -144,7 +182,7 @@ func (p *UnixProcess) Refresh() error {
 		return err
 	}
 
-	p.ppid, p.pgrp, p.sid, p.binary = copy_params(&k)
+	p.ppid, p.pgrp, p.sid, p.uid, p.binary = copy_params(&k)
 	return nil
 }
 
@@ -158,7 +196,7 @@ func copy_params(k *Kinfo_proc) (int, int, int, string) {
 	}
 	comm := string(k.Ki_comm[:n])
 
-	return int(k.Ki_ppid), int(k.Ki_pgid), int(k.Ki_sid), comm
+	return int(k.Ki_ppid), int(k.Ki_pgid), int(k.Ki_sid), int(k.Ki_uid), comm
 }
 
 func findProcess(pid int) (Process, error) {
@@ -197,7 +235,7 @@ func processes() ([]Process, error) {
 		if err != nil {
 			continue
 		}
-		p.ppid, p.pgrp, p.sid, p.binary = copy_params(&k)
+		p.ppid, p.pgrp, p.sid, p.uid, p.binary = copy_params(&k)
 
 		results = append(results, p)
 	}

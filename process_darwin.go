@@ -3,15 +3,45 @@
 package ps
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
+	"os"
+	"strconv"
+	"strings"
 	"syscall"
 	"unsafe"
 )
 
+// User ids mapped to names
+var users = make(map[int]string)
+
+// Get user names and user ids from /etc/passwd
+func init() {
+	file, err := os.Open("/etc/passwd")
+	if err != nil {
+		return
+	}
+	scanner := bufio.NewScanner(file)
+	scanner.Split(bufio.ScanLines)
+	for scanner.Scan() {
+		s := strings.Split(scanner.Text(), ":")
+		if len(s) < 3 {
+			continue
+		}
+		i, err := strconv.Atoi(s[2])
+		if err != nil {
+			continue
+		}
+		users[i] = s[0]
+	}
+	file.Close()
+}
+
 type DarwinProcess struct {
 	pid    int
 	ppid   int
+	uid    int
 	binary string
 }
 
@@ -21,6 +51,14 @@ func (p *DarwinProcess) Pid() int {
 
 func (p *DarwinProcess) PPid() int {
 	return p.ppid
+}
+
+func (p *UnixProcess) Uid() int {
+	return p.uid
+}
+
+func (p *UnixProcess) User() string {
+	return users[p.uid]
 }
 
 func (p *DarwinProcess) Executable() string {
